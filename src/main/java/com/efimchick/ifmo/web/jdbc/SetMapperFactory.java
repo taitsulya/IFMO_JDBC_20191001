@@ -12,6 +12,7 @@ import com.efimchick.ifmo.web.jdbc.domain.Employee;
 import com.efimchick.ifmo.web.jdbc.domain.FullName;
 import com.efimchick.ifmo.web.jdbc.domain.Position;
 
+
 public class SetMapperFactory {
 
     public SetMapper<Set<Employee>> employeesSetMapper() {
