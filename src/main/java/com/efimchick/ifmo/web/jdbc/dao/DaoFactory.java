@@ -29,6 +29,14 @@ public class DaoFactory {
         }
     }
 
+    private void execute(String sql) {
+        try {
+            Connection connection = ConnectionSource.instance().createConnection();
+            Statement statement = connection.createStatement();
+            statement.execute(sql);
+        } catch (SQLException ignored) {}
+    }
+
     private Employee getEmployee(ResultSet resultSet) throws SQLException {
             BigInteger id = BigInteger.valueOf(resultSet.getInt("id"));
             FullName fullname = new FullName(
@@ -51,10 +59,9 @@ public class DaoFactory {
                     departmentId);
     }
 
-    private List<Employee> getEmployeeList() {
+    private List<Employee> getEmployeeList(ResultSet resultSet) {
         try {
             List<Employee> empList = new LinkedList<>();
-            ResultSet resultSet = getResultSet("select * from employee");
             while (resultSet.next()) {
                 empList.add(getEmployee(resultSet));
             }
@@ -63,8 +70,6 @@ public class DaoFactory {
             return null;
         }
     }
-
-    private List<Employee> employeeList = getEmployeeList();
 
 
     private Department getDepartment(ResultSet resultSet) throws SQLException {
@@ -77,10 +82,9 @@ public class DaoFactory {
                     location);
     }
 
-    private List<Department> getDepartmentList() {
+    private List<Department> getDepartmentList(ResultSet resultSet) {
         try {
             List<Department> depList = new LinkedList<>();
-            ResultSet resultSet = getResultSet("select * from department");
             while (resultSet.next()) {
                 depList.add(getDepartment(resultSet));
             }
@@ -90,63 +94,76 @@ public class DaoFactory {
     }
     }
 
-    private List<Department> departmentList = getDepartmentList();
-
     public EmployeeDao employeeDAO() {
 
         return new EmployeeDao() {
             @Override
             public List<Employee> getByDepartment(Department department) {
-                List<Employee> resultList = new LinkedList<>();
-                for (Employee employee : employeeList) {
-                    if (employee.getDepartmentId().equals(department.getId())) {
-                        resultList.add(employee);
-                    }
-                }
-                return resultList;
+                ResultSet resultSet = getResultSet("select * from employee" +
+                        " where department = " + department.getId());
+                return getEmployeeList(resultSet);
             }
 
             @Override
             public List<Employee> getByManager(Employee employee) {
-                List<Employee> resultList = new LinkedList<>();
-                for (Employee value : employeeList) {
-                    if (value.getManagerId().equals(employee.getId())) {
-                        resultList.add(value);
-                    }
-                }
-                return resultList;
+                ResultSet resultSet = getResultSet("select * from employee" +
+                        " where manager = " + employee.getId());
+                return getEmployeeList(resultSet);
             }
 
             @Override
             public Optional<Employee> getById(BigInteger Id) {
-                Optional<Employee> resultList = Optional.empty();
-                for (Employee employee : employeeList) {
-                    if (employee.getId().equals(Id)) {
-                        resultList = Optional.of(employee);
+                try {
+                    ResultSet resultSet = getResultSet("select * from employee" +
+                            " where id = " + Id);
+                    if (resultSet.next()) {
+                        return Optional.of(getEmployee(resultSet));
+                    } else {
+                        return Optional.empty();
                     }
+                } catch (SQLException e) {
+                    return Optional.empty();
                 }
-                return resultList;
             }
 
             @Override
             public List<Employee> getAll() {
-                return employeeList;
+                ResultSet resultSet = getResultSet("select * from employee");
+                return getEmployeeList(resultSet);
             }
 
             @Override
             public Employee save(Employee employee) {
-                for (int i = 0; i < employeeList.size(); i++) {
-                    if (employeeList.get(i).getId().equals(employee.getId())) {
-                        employeeList.remove(i);
-                    }
+                if (getById(employee.getId()).equals(Optional.empty())) {
+                    execute("insert into employee values (" +
+                            employee.getId() + " , '" +
+                            employee.getFullName().getFirstName() + "' , '" +
+                            employee.getFullName().getLastName() + "' , '" +
+                            employee.getFullName().getMiddleName() + "' , '" +
+                            employee.getPosition() + "' , " +
+                            employee.getManagerId() + " , '" +
+                            employee.getHired() + "' , " +
+                            employee.getSalary() + " , " +
+                            employee.getDepartmentId() + ")");
+                } else {
+                    execute("update employee set" +
+                            " id = " + employee.getId() + " ," +
+                            " firstname = '" + employee.getFullName().getFirstName() + "' ," +
+                            " lastname = '" + employee.getFullName().getLastName() + "' ," +
+                            " middlename = '" + employee.getFullName().getMiddleName() + "' ," +
+                            " position = '" + employee.getPosition() + "' ," +
+                            " manager = " + employee.getManagerId() + " ," +
+                            " hiredate = '" + employee.getHired() + "' ," +
+                            " salary = " + employee.getSalary() + " ," +
+                            " department = " + employee.getDepartmentId() +
+                            " where id = " + employee.getId());
                 }
-                employeeList.add(employee);
                 return employee;
             }
 
             @Override
             public void delete(Employee employee) {
-                employeeList.remove(employee);
+                execute("delete from employee where id =" + employee.getId());
             }
         };
 
@@ -158,34 +175,45 @@ public class DaoFactory {
         return new DepartmentDao() {
             @Override
             public Optional<Department> getById(BigInteger Id) {
-                Optional<Department> resultList = Optional.empty();
-                for (Department department : departmentList) {
-                    if (department.getId().equals(Id)) {
-                        resultList = Optional.of(department);
+                try {
+                    ResultSet resultSet = getResultSet("select * from department" +
+                            " where id = " + Id);
+                    if (resultSet.next()) {
+                        return Optional.of(getDepartment(resultSet));
+                    } else {
+                        return Optional.empty();
                     }
+                } catch (SQLException e) {
+                    return Optional.empty();
                 }
-                return resultList;
             }
 
             @Override
             public List<Department> getAll() {
-                return departmentList;
+                ResultSet resultSet = getResultSet("select * from department");
+                return getDepartmentList(resultSet);
             }
 
             @Override
             public Department save(Department department) {
-                for (int i = 0; i < departmentList.size(); i++) {
-                    if (departmentList.get(i).getId().equals(department.getId())) {
-                        departmentList.remove(i);
-                    }
+                if (getById(department.getId()).equals(Optional.empty())) {
+                    execute("insert into department values (" +
+                            department.getId() + " , '" +
+                            department.getName() + "' , '" +
+                            department.getLocation() + "')");
+                } else {
+                    execute("update department set" +
+                            " id = " + department.getId() + " ," +
+                            " name = '" + department.getName() + "' ," +
+                            " location = '" + department.getLocation() +
+                            "' where id = " + department.getId());
                 }
-                departmentList.add(department);
                 return department;
             }
 
             @Override
             public void delete(Department department) {
-                departmentList.remove(department);
+                execute("delete from department where id =" + department.getId());
             }
         };
         //throw new UnsupportedOperationException();
